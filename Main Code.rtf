@@ -1,0 +1,910 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2867
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 """\
+ClinIQ \'97 AI-Powered Medical Report Intelligence\
+Powered by LlamaTron RS1 Rolex (Fine-tuned Llama-3.2-1B on ReasonMed 370K)\
+Agentic RAG with PubMed | Clinical PDF Analysis | Abnormal Value Flagging\
+"""\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# INSTALL (run this cell first in Kaggle)\
+# !pip install llama-cpp-python gradio pymupdf requests pyngrok -q\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+import gradio as gr\
+import fitz\
+import requests\
+import xml.etree.ElementTree as ET\
+import time\
+from llama_cpp import Llama\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# MODEL LOADING\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+print("\uc0\u9203  Loading LlamaTron RS1 Rolex from HuggingFace...")\
+llm = Llama.from_pretrained(\
+    repo_id="Rumiii/LlamaTron-RS1-Rolex",\
+    filename="llama3.2-1b-medical-reasonmed-fp16.gguf",\
+    n_ctx=2048,\
+    n_threads=4,\
+    verbose=False,\
+)\
+print("\uc0\u9989  LlamaTron RS1 Rolex loaded successfully.")\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# PDF PARSING\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+def extract_text_from_pdf(pdf_file):\
+    if pdf_file is None:\
+        return None, "\uc0\u9888 \u65039  No PDF uploaded."\
+    try:\
+        doc = fitz.open(pdf_file.name)\
+        text = ""\
+        for page in doc:\
+            text += page.get_text()\
+        doc.close()\
+        if not text.strip():\
+            return None, "\uc0\u9888 \u65039  PDF appears to be empty or scanned (no extractable text)."\
+        return text.strip(), None\
+    except Exception as e:\
+        return None, f"\uc0\u9888 \u65039  Error reading PDF: \{str(e)\}"\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# AGENTIC RAG \'97 PUBMED\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+PUBMED_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"\
+PUBMED_FETCH_URL  = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"\
+\
+def pubmed_search(query, max_results=3):\
+    try:\
+        search_params = \{"db": "pubmed", "term": query, "retmax": max_results, "retmode": "json", "sort": "relevance"\}\
+        search_resp = requests.get(PUBMED_SEARCH_URL, params=search_params, timeout=10)\
+        ids = search_resp.json().get("esearchresult", \{\}).get("idlist", [])\
+        if not ids:\
+            return []\
+        fetch_params = \{"db": "pubmed", "id": ",".join(ids), "retmode": "xml", "rettype": "abstract"\}\
+        fetch_resp = requests.get(PUBMED_FETCH_URL, params=fetch_params, timeout=10)\
+        root = ET.fromstring(fetch_resp.content)\
+        results = []\
+        for article in root.findall(".//PubmedArticle"):\
+            try:\
+                title = article.findtext(".//ArticleTitle", default="No title")\
+                abstract = article.findtext(".//AbstractText", default="No abstract available.")\
+                pmid = article.findtext(".//PMID", default="")\
+                year = article.findtext(".//PubDate/Year", default="n.d.")\
+                results.append(\{"title": title, "abstract": abstract[:600], "pmid": pmid, "year": year,\
+                                 "url": f"https://pubmed.ncbi.nlm.nih.gov/\{pmid\}/"\})\
+            except:\
+                continue\
+        return results\
+    except:\
+        return []\
+\
+def agent_decide_retrieval(finding):\
+    finding_lower = finding.lower()\
+    normal_kw = ["normal", "within range", "unremarkable", "negative", "no abnormality"]\
+    trigger_kw = ["high", "low", "elevated", "decreased", "abnormal", "critical", "positive",\
+                  "detected", "deficiency", "excess", "increased", "reduced", "borderline",\
+                  "severe", "mild", "moderate", "irregular", "abnormality", "risk", "concern"]\
+    for nk in normal_kw:\
+        if nk in finding_lower:\
+            return False\
+    for tk in trigger_kw:\
+        if tk in finding_lower:\
+            return True\
+    return False\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# LLAMATRON INFERENCE\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+def llamatron_analyze(report_text):\
+    prompt = f"""You are ClinIQ, a precise clinical AI assistant. Analyze the clinical report below.\
+\
+STRICT RULES:\
+- List ONLY findings that are explicitly stated as abnormal or outside normal range in the report\
+- Do NOT invent, repeat, or speculate beyond what the report states\
+- Do NOT repeat the same finding more than once\
+- Stop immediately after listing all findings \'97 no summaries, no repeated conclusions\
+- Each finding must follow the exact format below, nothing else\
+\
+--- CLINICAL REPORT ---\
+\{report_text[:2500]\}\
+--- END REPORT ---\
+\
+For each abnormal finding, write EXACTLY this format then a line with only ---\
+\
+FINDING: [exact test or symptom name from report]\
+VALUE: [exact value or description from report]\
+STATUS: [one of: CRITICAL / HIGH / MODERATE / LOW]\
+REASONING: [2-3 sentences only \'97 why this is abnormal and what it indicates]\
+CLINICAL SIGNIFICANCE: [1-2 sentences \'97 clinical implication]\
+---\
+\
+List findings now, one by one. Do not repeat any finding. Stop after the last one.\
+"""\
+    response = llm.create_chat_completion(\
+        messages=[\
+            \{"role": "system", "content": "You are a concise clinical AI. You follow instructions exactly. You never repeat yourself. You stop when done."\},\
+            \{"role": "user", "content": prompt\}\
+        ],\
+        max_tokens=1000,\
+        temperature=0.1,\
+        top_p=0.85,\
+        repeat_penalty=1.3,\
+    )\
+    return response["choices"][0]["message"]["content"]\
+\
+def parse_findings(llm_output):\
+    findings = []\
+    blocks = llm_output.strip().split("---")\
+    for block in blocks:\
+        block = block.strip()\
+        if not block or "FINDING:" not in block:\
+            continue\
+        finding = \{\}\
+        for line in block.split("\\n"):\
+            if line.startswith("FINDING:"):\
+                finding["name"] = line.replace("FINDING:", "").strip()\
+            elif line.startswith("VALUE:"):\
+                finding["value"] = line.replace("VALUE:", "").strip()\
+            elif line.startswith("STATUS:"):\
+                finding["status"] = line.replace("STATUS:", "").strip()\
+            elif line.startswith("REASONING:"):\
+                finding["reasoning"] = line.replace("REASONING:", "").strip()\
+            elif line.startswith("CLINICAL SIGNIFICANCE:"):\
+                finding["significance"] = line.replace("CLINICAL SIGNIFICANCE:", "").strip()\
+        if "name" in finding:\
+            findings.append(finding)\
+\
+    # Fallback: model did not follow format \'97 wrap entire output as one finding\
+    if not findings and llm_output.strip():\
+        findings.append(\{\
+            "name": "Full Clinical Analysis",\
+            "value": "See reasoning below",\
+            "status": "MODERATE",\
+            "reasoning": llm_output.strip()[:2000],\
+            "significance": "LlamaTron analysis complete. Structured format not followed \'97 review reasoning above for full clinical details."\
+        \})\
+    return findings\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# PIPELINE\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+def run_cliniq_pipeline(pdf_file, progress=gr.Progress()):\
+    progress(0.05, desc="Reading PDF...")\
+    report_text, error = extract_text_from_pdf(pdf_file)\
+    if error:\
+        return error, ""\
+\
+    progress(0.25, desc="LlamaTron RS1 Rolex analyzing report...")\
+    llm_output = llamatron_analyze(report_text)\
+\
+    progress(0.50, desc="Parsing clinical findings...")\
+    findings = parse_findings(llm_output)\
+\
+    progress(0.65, desc="Agent deciding PubMed retrievals...")\
+    pubmed_evidence = \{\}\
+    for finding in findings:\
+        name = finding.get("name", "")\
+        significance = finding.get("significance", "")\
+        if agent_decide_retrieval(f"\{name\} \{significance\}"):\
+            progress(0.70, desc=f"Retrieving PubMed evidence for: \{name\}...")\
+            articles = pubmed_search(f"\{name\} clinical significance \{significance[:80]\}", max_results=2)\
+            if articles:\
+                pubmed_evidence[name] = articles\
+            time.sleep(0.4)\
+\
+    progress(0.90, desc="Generating ClinIQ report...")\
+    report = build_report(findings, pubmed_evidence)\
+    progress(1.0, desc="Analysis complete!")\
+    return report, llm_output\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# FOLLOW-UP Q&A\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+# Store report context globally for follow-up questions\
+_report_context = \{"text": ""\}\
+\
+def run_cliniq_pipeline_with_context(pdf_file, progress=gr.Progress()):\
+    """Pipeline that also stores report text for follow-up Q&A."""\
+    progress(0.05, desc="Reading PDF...")\
+    report_text, error = extract_text_from_pdf(pdf_file)\
+    if error:\
+        return error, "", []\
+\
+    _report_context["text"] = report_text  # Store for follow-up\
+\
+    progress(0.25, desc="LlamaTron RS1 Rolex analyzing report...")\
+    llm_output = llamatron_analyze(report_text)\
+\
+    progress(0.50, desc="Parsing clinical findings...")\
+    findings = parse_findings(llm_output)\
+\
+    progress(0.65, desc="Agent deciding PubMed retrievals...")\
+    pubmed_evidence = \{\}\
+    for finding in findings:\
+        name = finding.get("name", "")\
+        significance = finding.get("significance", "")\
+        if agent_decide_retrieval(f"\{name\} \{significance\}"):\
+            progress(0.70, desc=f"Retrieving PubMed evidence for: \{name\}...")\
+            articles = pubmed_search(f"\{name\} clinical significance \{significance[:80]\}", max_results=2)\
+            if articles:\
+                pubmed_evidence[name] = articles\
+            time.sleep(0.4)\
+\
+    progress(0.90, desc="Generating ClinIQ report...")\
+    report = build_report(findings, pubmed_evidence)\
+    progress(1.0, desc="Analysis complete!")\
+\
+    # Seed chat history\
+    history = [\{"role": "assistant", "content": "\uc0\u9989  Report analysis complete! You can now ask me follow-up questions about this clinical report."\}]\
+    return report, llm_output, history\
+\
+def answer_followup(question, history):\
+    """Answer follow-up questions about the uploaded report."""\
+    if not question.strip():\
+        return history, ""\
+\
+    if not _report_context["text"]:\
+        history = history or []\
+        history.append(\{"role": "user", "content": question\})\
+        history.append(\{"role": "assistant", "content": "\uc0\u9888 \u65039  No report has been analyzed yet. Please upload and analyze a PDF first."\})\
+        return history, ""\
+\
+    context = _report_context["text"][:2000]\
+\
+    prompt = f"""You are ClinIQ, a clinical AI assistant. You have already analyzed a clinical report.\
+Answer the following question about the report concisely and accurately.\
+\
+--- CLINICAL REPORT CONTEXT ---\
+\{context\}\
+--- END CONTEXT ---\
+\
+Question: \{question\}\
+\
+Answer in 2-4 clear sentences. Be direct and clinically precise."""\
+\
+    response = llm.create_chat_completion(\
+        messages=[\
+            \{"role": "system", "content": "You are ClinIQ, a concise clinical AI. Answer questions about clinical reports accurately and briefly."\},\
+            \{"role": "user", "content": prompt\}\
+        ],\
+        max_tokens=400,\
+        temperature=0.2,\
+        repeat_penalty=1.2,\
+    )\
+\
+    answer = response["choices"][0]["message"]["content"].strip()\
+    history = history or []\
+    history.append(\{"role": "user", "content": question\})\
+    history.append(\{"role": "assistant", "content": answer\})\
+    return history, ""\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# REPORT BUILDER\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+STATUS_EMOJI = \{"CRITICAL": "\uc0\u55357 \u56628 ", "HIGH": "\u55357 \u57312 ", "MODERATE": "\u55357 \u57313 ", "LOW": "\u55357 \u57314 ", "NORMAL": "\u9989 "\}\
+\
+def build_report(findings, pubmed_evidence):\
+    critical = [f for f in findings if f.get("status") == "CRITICAL"]\
+    high     = [f for f in findings if f.get("status") == "HIGH"]\
+    moderate = [f for f in findings if f.get("status") == "MODERATE"]\
+    normal   = [f for f in findings if f.get("status") in ("NORMAL", "LOW")]\
+\
+    lines = []\
+    lines.append("## ClinIQ Clinical Analysis Report")\
+    lines.append("*Powered by LlamaTron RS1 Rolex \'97 Fine-tuned on ReasonMed 370K*\\n")\
+    lines.append("---")\
+    lines.append("### Executive Summary\\n")\
+    lines.append("| Severity | Count |")\
+    lines.append("|----------|-------|")\
+    lines.append(f"| \uc0\u55357 \u56628  Critical | \{len(critical)\} |")\
+    lines.append(f"| \uc0\u55357 \u57312  High | \{len(high)\} |")\
+    lines.append(f"| \uc0\u55357 \u57313  Moderate | \{len(moderate)\} |")\
+    lines.append(f"| \uc0\u9989  Normal / Low | \{len(normal)\} |")\
+    lines.append(f"| \uc0\u55357 \u56538  PubMed retrievals | \{len(pubmed_evidence)\} |")\
+    lines.append("\\n---")\
+\
+    if not findings:\
+        lines.append("\uc0\u9888 \u65039  No structured findings could be parsed. See raw LlamaTron output below.")\
+        return "\\n".join(lines)\
+\
+    lines.append("### Detailed Findings with Clinical Reasoning\\n")\
+\
+    priority_order = ["CRITICAL", "HIGH", "MODERATE", "LOW", "NORMAL"]\
+    sorted_findings = sorted(\
+        findings,\
+        key=lambda f: priority_order.index(f.get("status", "NORMAL")) if f.get("status", "NORMAL") in priority_order else 99\
+    )\
+\
+    for i, finding in enumerate(sorted_findings, 1):\
+        name   = finding.get("name", "Unknown")\
+        value  = finding.get("value", "N/A")\
+        status = finding.get("status", "UNKNOWN")\
+        reason = finding.get("reasoning", "No reasoning provided.")\
+        signif = finding.get("significance", "Not specified.")\
+        emoji  = STATUS_EMOJI.get(status, "\uc0\u9898 ")\
+\
+        lines.append(f"#### \{emoji\} Finding \{i\}: \{name\}")\
+        lines.append(f"**Reported Value:** `\{value\}` &nbsp;&nbsp;&nbsp; **Severity:** `\{status\}`\\n")\
+        lines.append("**\uc0\u55358 \u56800  Clinical Reasoning:**")\
+        lines.append(f"> \{reason\}\\n")\
+        lines.append("**\uc0\u55357 \u56523  Clinical Significance:**")\
+        lines.append(f"> \{signif\}\\n")\
+\
+        if name in pubmed_evidence:\
+            lines.append("**\uc0\u55357 \u56538  PubMed Evidence (Agent Retrieved):**")\
+            for art in pubmed_evidence[name]:\
+                lines.append(f"- [\{art['title']\} (\{art['year']\})](\{art['url']\})")\
+                lines.append(f"  > \{art['abstract'][:300]\}...")\
+            lines.append("")\
+        else:\
+            lines.append("*Agent assessed: no PubMed retrieval required for this finding.*\\n")\
+\
+        lines.append("---")\
+\
+    lines.append("\\n> \uc0\u9888 \u65039  **Disclaimer:** This report is AI-generated for research and educational purposes only. "\
+                 "It is not a diagnostic tool and must not replace professional clinical judgment. "\
+                 "Always consult a qualified healthcare professional for medical decisions.")\
+    return "\\n".join(lines)\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# CSS \'97 Premium White Clinical UI\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+CUSTOM_CSS = """\
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&family=Source+Code+Pro:wght@400;500;600&display=swap');\
+\
+:root \{\
+    --white:      #ffffff;\
+    --off-white:  #f8f9fb;\
+    --surface:    #f1f3f7;\
+    --border:     #e2e6ed;\
+    --border-dk:  #cdd2db;\
+    --ink:        #0d1117;\
+    --ink-2:      #1f2937;\
+    --ink-3:      #4b5563;\
+    --ink-4:      #9ca3af;\
+    --blue:       #1d4ed8;\
+    --blue-lt:    #eff6ff;\
+    --blue-mid:   #3b82f6;\
+    --red:        #dc2626;\
+    --red-lt:     #fef2f2;\
+    --green:      #16a34a;\
+    --green-lt:   #f0fdf4;\
+    --radius:     14px;\
+\}\
+\
+*, *::before, *::after \{ box-sizing: border-box; \}\
+\
+body, .gradio-container \{\
+    background: var(--off-white) !important;\
+    font-family: 'Source Sans 3', system-ui, sans-serif !important;\
+    color: var(--ink) !important;\
+    -webkit-font-smoothing: antialiased;\
+\}\
+\
+/* \uc0\u9472 \u9472  TOPBAR \u9472 \u9472  */\
+.cq-topbar \{\
+    background: var(--white);\
+    border-bottom: 1.5px solid var(--border);\
+    padding: 0 48px;\
+    height: 66px;\
+    display: flex;\
+    align-items: center;\
+    justify-content: space-between;\
+    position: sticky;\
+    top: 0;\
+    z-index: 100;\
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);\
+\}\
+.cq-brand \{ display: flex; align-items: center; gap: 12px; \}\
+.cq-mark \{\
+    width: 38px; height: 38px;\
+    background: var(--ink);\
+    border-radius: 9px;\
+    display: flex; align-items: center; justify-content: center;\
+    font-size: 20px;\
+\}\
+.cq-name \{\
+    font-family: 'Playfair Display', serif !important;\
+    font-size: 1.5rem !important;\
+    font-weight: 700 !important;\
+    color: var(--ink) !important;\
+    letter-spacing: -0.02em;\
+\}\
+.cq-sub \{\
+    font-size: 0.68rem;\
+    color: var(--ink-4);\
+    font-family: 'Source Code Pro', monospace !important;\
+    letter-spacing: 0.04em;\
+    margin-top: 1px;\
+\}\
+.cq-pills \{ display: flex; gap: 7px; align-items: center; \}\
+.cpill \{\
+    display: inline-flex; align-items: center; gap: 5px;\
+    padding: 4px 12px; border-radius: 100px;\
+    font-size: 0.68rem; font-weight: 600;\
+    letter-spacing: 0.04em; text-transform: uppercase;\
+    font-family: 'Source Code Pro', monospace !important;\
+\}\
+.cpill-g \{ background: var(--green-lt); color: var(--green); border: 1px solid #bbf7d0; \}\
+.cpill-b \{ background: var(--blue-lt); color: var(--blue); border: 1px solid #bfdbfe; \}\
+.cpill-dot \{ width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 2s ease-in-out infinite; \}\
+@keyframes blink \{ 0%,100%\{opacity:1\} 50%\{opacity:0.25\} \}\
+\
+/* \uc0\u9472 \u9472  HERO \u9472 \u9472  */\
+.cq-hero \{\
+    background: var(--white);\
+    border-bottom: 1px solid var(--border);\
+    text-align: center;\
+    padding: 56px 48px 44px;\
+    animation: fadeUp 0.5s ease both;\
+\}\
+@keyframes fadeUp \{ from\{opacity:0;transform:translateY(12px)\} to\{opacity:1;transform:translateY(0)\} \}\
+.cq-eyebrow \{\
+    font-family: 'Source Code Pro', monospace !important;\
+    font-size: 0.68rem; font-weight: 600;\
+    color: var(--blue); letter-spacing: 0.16em;\
+    text-transform: uppercase; margin-bottom: 18px;\
+\}\
+.cq-h1 \{\
+    font-family: 'Playfair Display', serif !important;\
+    font-size: 3.4rem !important; font-weight: 700 !important;\
+    color: var(--ink) !important; line-height: 1.12 !important;\
+    letter-spacing: -0.03em !important; margin: 0 0 16px !important;\
+\}\
+.cq-h1 em \{ font-style: italic; color: var(--blue); \}\
+.cq-desc \{\
+    font-size: 1.05rem; color: var(--ink-3);\
+    line-height: 1.75; max-width: 580px;\
+    margin: 0 auto; font-weight: 300;\
+\}\
+.cq-stats \{\
+    display: flex; gap: 40px; margin-top: 32px;\
+    padding-top: 28px; border-top: 1px solid var(--border);\
+    justify-content: center; flex-wrap: wrap;\
+\}\
+.cq-stat-val \{\
+    font-family: 'Playfair Display', serif !important;\
+    font-size: 1.25rem; font-weight: 700; color: var(--ink); display: block;\
+\}\
+.cq-stat-lbl \{\
+    font-size: 0.65rem; color: var(--ink-4);\
+    text-transform: uppercase; letter-spacing: 0.09em;\
+    font-family: 'Source Code Pro', monospace !important;\
+\}\
+\
+/* \uc0\u9472 \u9472  UPLOAD SECTION (centered) \u9472 \u9472  */\
+.cq-upload-wrap \{\
+    background: var(--white);\
+    border-bottom: 1px solid var(--border);\
+    padding: 40px 48px;\
+    display: flex;\
+    flex-direction: column;\
+    align-items: center;\
+    gap: 20px;\
+\}\
+.cq-upload-inner \{\
+    width: 100%;\
+    max-width: 680px;\
+    display: flex;\
+    flex-direction: column;\
+    gap: 16px;\
+\}\
+.cq-upload-title \{\
+    font-family: 'Source Code Pro', monospace !important;\
+    font-size: 0.7rem; font-weight: 700;\
+    color: var(--ink-4); text-transform: uppercase;\
+    letter-spacing: 0.12em; text-align: center;\
+    padding-bottom: 10px;\
+    border-bottom: 1px solid var(--border);\
+\}\
+.cq-btn button \{\
+    background: var(--ink) !important;\
+    color: var(--white) !important;\
+    border: none !important;\
+    border-radius: 10px !important;\
+    font-family: 'Source Sans 3', sans-serif !important;\
+    font-size: 1.05rem !important;\
+    font-weight: 600 !important;\
+    padding: 16px 32px !important;\
+    width: 100% !important;\
+    transition: all 0.2s ease !important;\
+    box-shadow: 0 2px 12px rgba(13,17,23,0.18) !important;\
+    letter-spacing: 0.02em !important;\
+\}\
+.cq-btn button:hover \{\
+    background: #1a2535 !important;\
+    transform: translateY(-2px) !important;\
+    box-shadow: 0 6px 24px rgba(13,17,23,0.28) !important;\
+\}\
+.cq-warn \{\
+    background: var(--red-lt); border: 1px solid #fecaca;\
+    border-radius: 8px; padding: 10px 16px;\
+    font-size: 0.82rem; color: var(--red);\
+    line-height: 1.6; font-weight: 500; text-align: center;\
+\}\
+.cq-pipeline \{\
+    display: flex; flex-wrap: wrap; align-items: center;\
+    gap: 6px; justify-content: center;\
+\}\
+.cq-ppill \{\
+    background: var(--surface); border: 1px solid var(--border);\
+    border-radius: 100px; padding: 4px 12px;\
+    font-family: 'Source Code Pro', monospace;\
+    font-size: 0.7rem; font-weight: 500; color: var(--ink-2);\
+\}\
+.cq-parrow \{ color: var(--ink-4); font-size: 0.72rem; \}\
+\
+/* \uc0\u9472 \u9472  REPORT SECTION \u9472 \u9472  */\
+.cq-report-wrap \{\
+    padding: 40px 48px 48px;\
+    max-width: 1000px;\
+    margin: 0 auto;\
+    width: 100%;\
+\}\
+.cq-report-title \{\
+    font-family: 'Playfair Display', serif !important;\
+    font-size: 1.5rem !important; font-weight: 700 !important;\
+    color: var(--ink) !important; margin: 0 0 6px !important;\
+\}\
+.cq-report-subtitle \{\
+    font-size: 0.78rem; color: var(--ink-4);\
+    font-family: 'Source Code Pro', monospace !important;\
+    letter-spacing: 0.05em; margin-bottom: 20px;\
+    padding-bottom: 16px; border-bottom: 1.5px solid var(--border);\
+\}\
+\
+/* \uc0\u9472 \u9472  MARKDOWN REPORT \u9472 \u9472  */\
+.report-md \{\
+    font-family: 'Source Sans 3', sans-serif !important;\
+    font-size: 1.08rem !important;\
+    line-height: 1.9 !important;\
+    color: var(--ink-2) !important;\
+    max-height: 80vh !important;\
+    overflow-y: auto !important;\
+    overflow-x: hidden !important;\
+    padding: 8px 16px 24px 4px !important;\
+    scroll-behavior: smooth !important;\
+\}\
+.report-md h2 \{\
+    font-family: 'Playfair Display', serif !important;\
+    font-size: 1.8rem !important; font-weight: 700 !important;\
+    color: var(--ink) !important; letter-spacing: -0.02em !important;\
+    border-bottom: 2px solid var(--border) !important;\
+    padding-bottom: 14px !important; margin-bottom: 22px !important;\
+\}\
+.report-md h3 \{\
+    font-size: 0.72rem !important; font-weight: 700 !important;\
+    color: var(--ink-4) !important; text-transform: uppercase !important;\
+    letter-spacing: 0.1em !important; margin: 32px 0 14px !important;\
+    font-family: 'Source Code Pro', monospace !important;\
+    border-bottom: 1px solid var(--border) !important;\
+    padding-bottom: 8px !important;\
+\}\
+.report-md h4 \{\
+    font-family: 'Playfair Display', serif !important;\
+    font-size: 1.3rem !important; font-weight: 600 !important;\
+    color: var(--ink) !important; margin: 28px 0 12px !important;\
+\}\
+.report-md table \{\
+    width: 100% !important; border-collapse: collapse !important;\
+    margin: 16px 0 24px !important; font-size: 1rem !important;\
+    border: 1px solid var(--border) !important;\
+    border-radius: 10px !important; overflow: hidden !important;\
+\}\
+.report-md th \{\
+    background: var(--surface) !important; padding: 12px 18px !important;\
+    text-align: left !important; font-weight: 700 !important;\
+    font-size: 0.78rem !important; text-transform: uppercase !important;\
+    letter-spacing: 0.07em !important; color: var(--ink-3) !important;\
+    border-bottom: 1px solid var(--border) !important;\
+\}\
+.report-md td \{\
+    padding: 12px 18px !important;\
+    border-bottom: 1px solid var(--border) !important;\
+    color: var(--ink-2) !important; font-size: 1rem !important;\
+\}\
+.report-md blockquote \{\
+    border-left: 4px solid var(--blue-mid) !important;\
+    padding: 14px 20px !important; margin: 12px 0 18px !important;\
+    background: var(--blue-lt) !important;\
+    border-radius: 0 10px 10px 0 !important;\
+    color: var(--ink-2) !important;\
+    font-size: 1.02rem !important; line-height: 1.8 !important;\
+\}\
+.report-md code \{\
+    background: var(--surface) !important;\
+    border: 1px solid var(--border) !important;\
+    border-radius: 5px !important; padding: 3px 9px !important;\
+    font-family: 'Source Code Pro', monospace !important;\
+    font-size: 0.92rem !important; color: var(--ink) !important;\
+    font-weight: 500 !important;\
+\}\
+.report-md hr \{ border: none !important; border-top: 1px solid var(--border) !important; margin: 22px 0 !important; \}\
+.report-md strong \{ color: var(--ink); font-weight: 600; \}\
+.report-md a \{ color: var(--blue); text-decoration: none; font-weight: 500; \}\
+.report-md a:hover \{ text-decoration: underline; \}\
+.report-md ul \{ padding-left: 22px; \}\
+.report-md li \{ margin: 6px 0; color: var(--ink-2); font-size: 1rem; \}\
+.report-md p \{ margin: 10px 0; font-size: 1.05rem; \}\
+\
+/* RAW OUTPUT */\
+.raw-out textarea \{\
+    font-family: 'Source Code Pro', monospace !important;\
+    font-size: 0.88rem !important; line-height: 1.7 !important;\
+    color: var(--ink-2) !important; background: var(--off-white) !important;\
+    border: 1px solid var(--border) !important; border-radius: 8px !important;\
+\}\
+\
+/* LABELS */\
+label span \{\
+    font-family: 'Source Sans 3', sans-serif !important;\
+    font-size: 0.8rem !important; font-weight: 600 !important;\
+    color: var(--ink-3) !important; text-transform: uppercase !important;\
+    letter-spacing: 0.06em !important;\
+\}\
+\
+/* FOOTER */\
+.cq-footer \{\
+    background: var(--white); border-top: 1px solid var(--border);\
+    padding: 18px 48px;\
+    display: flex; align-items: center; justify-content: space-between;\
+\}\
+.cq-footer-l \{ font-family: 'Source Code Pro', monospace; font-size: 0.7rem; color: var(--ink-4); \}\
+.cq-footer-r \{ font-size: 0.78rem; color: var(--ink-4); \}\
+\
+::-webkit-scrollbar \{ width: 5px; \}\
+::-webkit-scrollbar-track \{ background: var(--off-white); \}\
+::-webkit-scrollbar-thumb \{ background: var(--border-dk); border-radius: 3px; \}\
+::-webkit-scrollbar-thumb:hover \{ background: var(--ink-4); \}\
+\
+/* \uc0\u9472 \u9472  FOLLOW-UP Q&A \u9472 \u9472  */\
+.cq-qa-wrap \{\
+    padding: 0 48px 48px;\
+    max-width: 1000px;\
+    margin: 0 auto;\
+    width: 100%;\
+\}\
+.cq-qa-title \{\
+    font-family: "Playfair Display", serif !important;\
+    font-size: 1.4rem !important; font-weight: 700 !important;\
+    color: var(--ink) !important; margin: 0 0 6px !important;\
+\}\
+.cq-qa-subtitle \{\
+    font-size: 0.75rem; color: var(--ink-4);\
+    font-family: "Source Code Pro", monospace !important;\
+    letter-spacing: 0.05em; margin-bottom: 16px;\
+    padding-bottom: 14px; border-bottom: 1.5px solid var(--border);\
+\}\
+.cq-ask-btn button \{\
+    background: var(--blue) !important;\
+    color: var(--white) !important;\
+    border: none !important; border-radius: 8px !important;\
+    font-family: "Source Sans 3", sans-serif !important;\
+    font-size: 0.95rem !important; font-weight: 600 !important;\
+    padding: 12px 24px !important;\
+    transition: all 0.2s ease !important;\
+    box-shadow: 0 2px 8px rgba(29,78,216,0.2) !important;\
+\}\
+.cq-ask-btn button:hover \{\
+    background: #1e40af !important;\
+    transform: translateY(-1px) !important;\
+    box-shadow: 0 4px 16px rgba(29,78,216,0.3) !important;\
+\}\
+/* Chatbot bubbles */\
+.cq-chat .message.user \{\
+    background: var(--ink) !important;\
+    color: var(--white) !important;\
+    border-radius: 14px 14px 4px 14px !important;\
+    font-size: 1rem !important;\
+    padding: 12px 18px !important;\
+    font-family: "Source Sans 3", sans-serif !important;\
+\}\
+.cq-chat .message.bot \{\
+    background: var(--blue-lt) !important;\
+    color: var(--ink-2) !important;\
+    border: 1px solid #bfdbfe !important;\
+    border-radius: 14px 14px 14px 4px !important;\
+    font-size: 1rem !important; line-height: 1.75 !important;\
+    padding: 14px 20px !important;\
+    font-family: "Source Sans 3", sans-serif !important;\
+\}\
+"""\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# GRADIO UI\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+def build_ui():\
+    with gr.Blocks(css=CUSTOM_CSS, title="ClinIQ \'97 Clinical Analysis Report") as demo:\
+\
+        # TOPBAR\
+        gr.HTML("""\
+        <div class="cq-topbar">\
+          <div class="cq-brand">\
+            <div class="cq-mark">\uc0\u9877 </div>\
+            <div>\
+              <div class="cq-name">ClinIQ</div>\
+              <div class="cq-sub">Clinical Analysis Report \'b7 Powered by LlamaTron RS1 Rolex</div>\
+            </div>\
+          </div>\
+          <div class="cq-pills">\
+            <span class="cpill cpill-g"><span class="cpill-dot"></span>Model Ready</span>\
+            <span class="cpill cpill-b">LlamaTron RS1 Rolex</span>\
+            <span class="cpill cpill-b">ReasonMed 370K</span>\
+          </div>\
+        </div>\
+        """)\
+\
+        # HERO\
+        gr.HTML("""\
+        <div class="cq-hero">\
+          <div class="cq-eyebrow">\uc0\u9877  &nbsp; Clinical AI Research Platform</div>\
+          <h1 class="cq-h1">Clinical Analysis Report<br><em>Powered by LlamaTron RS1 Rolex</em></h1>\
+          <p class="cq-desc">\
+            Upload any clinical PDF report. ClinIQ flags abnormal values with\
+            Chain-of-Thought reasoning and retrieves PubMed evidence for significant findings.\
+          </p>\
+          <div class="cq-stats">\
+            <div><span class="cq-stat-val">LlamaTron RS1</span><span class="cq-stat-lbl">Your Fine-Tuned Model</span></div>\
+            <div><span class="cq-stat-val">370K</span><span class="cq-stat-lbl">ReasonMed Examples</span></div>\
+            <div><span class="cq-stat-val">Agentic RAG</span><span class="cq-stat-lbl">PubMed Evidence</span></div>\
+            <div><span class="cq-stat-val">CoT</span><span class="cq-stat-lbl">Chain-of-Thought</span></div>\
+          </div>\
+        </div>\
+        """)\
+\
+        # UPLOAD SECTION \'97 centered\
+        gr.HTML('<div class="cq-upload-wrap"><div class="cq-upload-inner"><div class="cq-upload-title">\uc0\u55357 \u56513  Upload Clinical PDF Report</div>')\
+\
+        with gr.Column(elem_classes=["cq-upload-inner"]):\
+            pdf_input = gr.File(\
+                label="Attach Clinical PDF",\
+                file_types=[".pdf"],\
+            )\
+            analyze_btn = gr.Button(\
+                "\uc0\u55357 \u56620   Analyze Report",\
+                variant="primary",\
+                elem_classes=["cq-btn"],\
+            )\
+\
+        gr.HTML("""\
+        <div style="width:100%;max-width:680px;">\
+          <div class="cq-warn">\uc0\u9888 \u65039  <strong>Research & Educational Use Only.</strong> Not a substitute for professional clinical judgment.</div>\
+          <div class="cq-pipeline" style="margin-top:14px;">\
+            <span class="cq-ppill">\uc0\u55357 \u56516  PDF</span>\
+            <span class="cq-parrow">\uc0\u8594 </span>\
+            <span class="cq-ppill">\uc0\u55358 \u56800  LlamaTron RS1 Rolex</span>\
+            <span class="cq-parrow">\uc0\u8594 </span>\
+            <span class="cq-ppill">\uc0\u55358 \u56598  Agentic Decision</span>\
+            <span class="cq-parrow">\uc0\u8594 </span>\
+            <span class="cq-ppill">\uc0\u55357 \u56538  PubMed RAG</span>\
+            <span class="cq-parrow">\uc0\u8594 </span>\
+            <span class="cq-ppill">\uc0\u55357 \u56523  Report</span>\
+          </div>\
+        </div>\
+        </div></div>\
+        """)\
+\
+        # REPORT SECTION\
+        gr.HTML("""\
+        <div class="cq-report-wrap">\
+          <div class="cq-report-title">Clinical Analysis Report</div>\
+          <div class="cq-report-subtitle">Powered by LlamaTron RS1 Rolex \'b7 Agentic PubMed RAG \'b7 ReasonMed 370K</div>\
+        </div>\
+        """)\
+\
+        with gr.Column(elem_classes=["cq-report-wrap"]):\
+            report_output = gr.Markdown(\
+                value="""## Clinical Analysis Report\
+*Powered by LlamaTron RS1 Rolex \'97 Fine-tuned on ReasonMed 370K*\
+\
+---\
+\
+Upload a clinical PDF above and click **Analyze Report** to begin.\
+\
+ClinIQ will:\
+1. Extract and read your clinical report text\
+2. Flag all abnormal values using LlamaTron RS1 Rolex Chain-of-Thought reasoning\
+3. Retrieve supporting PubMed literature for significant findings via Agentic RAG\
+4. Generate a fully structured clinical analysis report here\
+""",\
+                elem_classes=["report-md"],\
+            )\
+\
+            with gr.Accordion("\uc0\u55358 \u56800  Raw LlamaTron RS1 Rolex Output", open=False):\
+                raw_output = gr.Textbox(\
+                    label="Raw model output",\
+                    lines=14,\
+                    interactive=False,\
+                    elem_classes=["raw-out"],\
+                    placeholder="Raw LlamaTron reasoning will appear here after analysis...",\
+                )\
+\
+        # FOLLOW-UP Q&A SECTION\
+        gr.HTML("""\
+        <div class="cq-qa-wrap">\
+          <div class="cq-qa-title">\uc0\u55357 \u56492  Follow-Up Questions</div>\
+          <div class="cq-qa-subtitle">Ask ClinIQ anything about the analyzed report \'97 powered by LlamaTron RS1 Rolex</div>\
+        </div>\
+        """)\
+\
+        with gr.Column(elem_classes=["cq-qa-wrap"]):\
+            chatbot = gr.Chatbot(\
+                label="Clinical Q&A",\
+                height=420,\
+                type="messages",\
+                elem_classes=["cq-chat"],\
+                placeholder="Analyze a report above, then ask follow-up questions here...",\
+                show_label=False,\
+            )\
+            with gr.Row():\
+                followup_input = gr.Textbox(\
+                    label="",\
+                    placeholder="e.g. What does the elevated HbA1c indicate? What treatment is recommended?",\
+                    scale=5,\
+                    lines=1,\
+                    container=False,\
+                )\
+                ask_btn = gr.Button(\
+                    "Ask \uc0\u10140 ",\
+                    variant="primary",\
+                    scale=1,\
+                    elem_classes=["cq-ask-btn"],\
+                )\
+\
+        # FOOTER\
+        gr.HTML("""\
+        <div class="cq-footer">\
+          <span class="cq-footer-l">ClinIQ \'b7 LlamaTron RS1 Rolex \'b7 Llama-3.2-1B \'d7 ReasonMed 370K \'b7 Agentic PubMed RAG</span>\
+          <span class="cq-footer-r">Research &amp; Educational Use Only</span>\
+        </div>\
+        """)\
+\
+        # EVENTS\
+        analyze_btn.click(\
+            fn=run_cliniq_pipeline_with_context,\
+            inputs=[pdf_input],\
+            outputs=[report_output, raw_output, chatbot],\
+            show_progress=True,\
+        )\
+\
+        ask_btn.click(\
+            fn=answer_followup,\
+            inputs=[followup_input, chatbot],\
+            outputs=[chatbot, followup_input],\
+        )\
+\
+        followup_input.submit(\
+            fn=answer_followup,\
+            inputs=[followup_input, chatbot],\
+            outputs=[chatbot, followup_input],\
+        )\
+\
+    return demo\
+\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+# LAUNCH\
+# \uc0\u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \
+\
+demo = build_ui()\
+demo.launch(\
+    server_name="0.0.0.0",\
+    server_port=7861,\
+    share=True,\
+    show_error=True,\
+)}
